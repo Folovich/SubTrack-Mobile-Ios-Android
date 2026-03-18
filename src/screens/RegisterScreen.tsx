@@ -7,6 +7,7 @@ import { useI18n } from "../context/SettingsContext";
 import type { AuthStackParamList } from "../types/navigation";
 import AppButton from "../components/AppButton";
 import type { AppPalette } from "../theme/theme";
+import { mapAuthError, type AuthFieldErrors } from "../utils/authError";
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, "Register">;
 
@@ -19,22 +20,36 @@ const RegisterScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onRegister = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError(tr("enterEmailPassword"));
+    const nextFieldErrors: AuthFieldErrors = {};
+    if (!email.trim()) {
+      nextFieldErrors.email = tr("emailRequired");
+    }
+    if (!password.trim()) {
+      nextFieldErrors.password = tr("passwordRequired");
+    }
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setGeneralError(null);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setError(null);
+      setGeneralError(null);
+      setFieldErrors({});
       await signUp({ name: name.trim(), email: email.trim(), password });
     } catch (registerError) {
-      const message = registerError instanceof Error ? registerError.message : tr("registerFailed");
-      setError(message);
+      const { generalError: nextGeneralError, fieldErrors: nextFieldErrors } = mapAuthError(
+        registerError,
+        tr
+      );
+      setGeneralError(nextGeneralError);
+      setFieldErrors(nextFieldErrors);
     } finally {
       setIsSubmitting(false);
     }
@@ -61,32 +76,48 @@ const RegisterScreen = () => {
         value={name}
         onChangeText={setName}
       />
-      <TextInput
-        autoCapitalize="none"
-        keyboardType="email-address"
-        placeholder={tr("email")}
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-      />
-      <View style={styles.passwordRow}>
+      <View style={styles.fieldBlock}>
         <TextInput
-          placeholder={tr("password")}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholder={tr("email")}
           placeholderTextColor={colors.textMuted}
-          secureTextEntry={!showPassword}
-          style={[styles.input, styles.passwordInput]}
-          value={password}
-          onChangeText={setPassword}
+          style={[styles.input, fieldErrors.email ? styles.inputError : null]}
+          value={email}
+          onChangeText={(value) => {
+            setEmail(value);
+            if (fieldErrors.email) {
+              setFieldErrors((prev) => ({ ...prev, email: undefined }));
+            }
+          }}
         />
-        <AppButton
-          title={showPassword ? tr("hide") : tr("show")}
-          variant="ghost"
-          onPress={() => setShowPassword((prev) => !prev)}
-        />
+        {fieldErrors.email ? <Text style={styles.fieldError}>{fieldErrors.email}</Text> : null}
       </View>
-      <Text style={styles.hint}>{tr("passwordRequirements")}</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.fieldBlock}>
+        <View style={styles.passwordRow}>
+          <TextInput
+            placeholder={tr("password")}
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry={!showPassword}
+            style={[styles.input, styles.passwordInput, fieldErrors.password ? styles.inputError : null]}
+            value={password}
+            onChangeText={(value) => {
+              setPassword(value);
+              if (fieldErrors.password) {
+                setFieldErrors((prev) => ({ ...prev, password: undefined }));
+              }
+            }}
+          />
+          <AppButton
+            title={showPassword ? tr("hide") : tr("show")}
+            variant="ghost"
+            onPress={() => setShowPassword((prev) => !prev)}
+          />
+        </View>
+        <Text style={styles.hint}>{tr("passwordRequirements")}</Text>
+        {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
+      </View>
+      {generalError ? <Text style={styles.error}>{generalError}</Text> : null}
       <View style={styles.action}>
         <AppButton
           disabled={isSubmitting}
@@ -166,6 +197,13 @@ const createStyles = (colors: AppPalette) =>
     paddingHorizontal: 14,
     paddingVertical: 14
   },
+  inputError: {
+    borderColor: colors.danger
+  },
+  fieldBlock: {
+    width: "100%",
+    gap: 6
+  },
   passwordRow: {
     width: "100%",
     flexDirection: "row",
@@ -187,6 +225,11 @@ const createStyles = (colors: AppPalette) =>
     color: colors.textMuted,
     fontSize: 12,
     lineHeight: 18
+  },
+  fieldError: {
+    color: colors.danger,
+    fontSize: 12,
+    lineHeight: 17
   },
   link: {
     color: colors.accent,
