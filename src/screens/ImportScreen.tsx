@@ -16,7 +16,7 @@ import type { AppPalette } from "../theme/theme";
 
 const formatDateTime = (value: string | null) => {
   if (!value) {
-    return "Not available";
+    return null;
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -54,7 +54,7 @@ const getItemSummary = (item: ImportItemResult) => {
 };
 
 const ImportScreen = () => {
-  const { colors } = useI18n();
+  const { tr, colors } = useI18n();
   const styles = createStyles(colors);
   const [consent, setConsent] = useState<ImportConsentStatus | null>(null);
   const [integration, setIntegration] = useState<IntegrationStatus | null>(null);
@@ -96,16 +96,16 @@ const ImportScreen = () => {
 
   const connectionHint = useMemo(() => {
     if (needsReauth) {
-      return "Google access expired or was revoked. Reconnect Gmail before the next sync.";
+      return tr("mailHintExpired");
     }
     if (isConnected) {
-      return "Mailbox sync will fetch relevant billing emails directly from Gmail with read-only access.";
+      return tr("mailHintConnected");
     }
     if (consent?.status === "GRANTED") {
-      return "Consent exists, but mailbox is not connected yet. Finish Gmail OAuth to enable sync.";
+      return tr("mailHintConsentOnly");
     }
-    return "Connect Gmail to grant explicit consent and import billing emails end-to-end.";
-  }, [consent?.status, isConnected, needsReauth]);
+    return tr("mailHintDefault");
+  }, [consent?.status, isConnected, needsReauth, tr]);
 
   const handleConnect = async () => {
     setError(null);
@@ -117,7 +117,7 @@ const ImportScreen = () => {
       const supported = await Linking.canOpenURL(response.authorizationUrl);
 
       if (!supported) {
-        throw new Error("Cannot open Gmail authorization URL.");
+        throw new Error(tr("supportDraftOpenError"));
       }
 
       await Linking.openURL(response.authorizationUrl);
@@ -148,7 +148,7 @@ const ImportScreen = () => {
       await loadImportPage();
       setNotice({
         kind: "success",
-        text: "Gmail was disconnected and consent was revoked."
+        text: tr("mailDisconnectSuccess")
       });
     } catch (disconnectError) {
       setError(getErrorMessage(disconnectError));
@@ -168,7 +168,7 @@ const ImportScreen = () => {
       await loadImportPage();
       setNotice({
         kind: "success",
-        text: `Mailbox sync finished with status ${syncResult.status}.`
+        text: tr("mailSyncSuccess")
       });
     } catch (syncError) {
       setError(getErrorMessage(syncError));
@@ -193,11 +193,8 @@ const ImportScreen = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Import</Text>
-      <Text style={styles.meta}>
-        Connect Gmail with read-only access, sync relevant billing emails, and review which subscriptions were imported,
-        skipped, unsupported, or failed to parse.
-      </Text>
+      <Text style={styles.title}>{tr("mailTitle")}</Text>
+      <Text style={styles.meta}>{tr("mailSubtitle")}</Text>
 
       {notice ? (
         <Text style={notice.kind === "success" ? styles.success : styles.error}>{notice.text}</Text>
@@ -205,50 +202,75 @@ const ImportScreen = () => {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Gmail mailbox import</Text>
+        <Text style={styles.sectionTitle}>{tr("mailSectionConnection")}</Text>
 
         <View style={styles.card}>
-          <Text style={styles.itemTitle}>Consent</Text>
-          <Text style={styles.meta}>Status: {consent?.status ?? (isLoading ? "Loading..." : "Unknown")}</Text>
-          <Text style={styles.meta}>Scope: {consent?.scope ?? "Not granted yet"}</Text>
-          <Text style={styles.meta}>Granted: {formatDateTime(consent?.grantedAt ?? null)}</Text>
+          <Text style={styles.itemTitle}>{tr("mailConsentCard")}</Text>
+          <Text style={styles.meta}>
+            {tr("mailStatus")}: {consent?.status ?? (isLoading ? tr("mailLoadingState") : tr("mailUnknown"))}
+          </Text>
+          <Text style={styles.meta}>{tr("mailScope")}: {consent?.scope ?? tr("mailNotGranted")}</Text>
+          <Text style={styles.meta}>
+            {tr("mailGranted")}: {formatDateTime(consent?.grantedAt ?? null) ?? tr("mailNotAvailable")}
+          </Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.itemTitle}>Connection</Text>
-          <Text style={styles.meta}>Status: {integration?.status ?? (isLoading ? "Loading..." : "NOT_CONNECTED")}</Text>
-          <Text style={styles.meta}>Mailbox: {integration?.externalAccountEmail ?? "Not connected"}</Text>
-          <Text style={styles.meta}>Last sync: {formatDateTime(integration?.lastSyncAt ?? null)}</Text>
+          <Text style={styles.itemTitle}>{tr("mailConnectionCard")}</Text>
+          <Text style={styles.meta}>
+            {tr("mailStatus")}: {integration?.status ?? (isLoading ? tr("mailLoadingState") : tr("mailNotConnected"))}
+          </Text>
+          <Text style={styles.meta}>{tr("mailMailbox")}: {integration?.externalAccountEmail ?? tr("mailNotConnected")}</Text>
+          <Text style={styles.meta}>
+            {tr("mailLastSync")}: {formatDateTime(integration?.lastSyncAt ?? null) ?? tr("mailNotAvailable")}
+          </Text>
         </View>
 
         <Text style={styles.meta}>{connectionHint}</Text>
         {integration?.lastErrorMessage ? (
-          <Text style={styles.meta}>Last Gmail error: {integration.lastErrorMessage}</Text>
+          <Text style={styles.meta}>
+            {tr("mailLastError")}: {integration.lastErrorMessage}
+          </Text>
         ) : null}
 
         <View style={styles.actions}>
-          <AppButton
-            title={busyAction === "connect" ? "Redirecting..." : isConnected ? "Reconnect Gmail" : "Connect Gmail"}
-            onPress={() => void handleConnect()}
-            disabled={busyAction !== null}
-          />
-          <AppButton
-            title={busyAction === "sync" ? "Syncing..." : "Sync mailbox"}
-            variant="ghost"
-            onPress={() => void handleSync()}
-            disabled={busyAction !== null || !canSync}
-          />
-          <AppButton
-            title={busyAction === "disconnect" ? "Disconnecting..." : "Disconnect"}
-            variant="ghost"
-            onPress={() => void handleDisconnect()}
-            disabled={busyAction !== null || (!integration?.id && !consent)}
-          />
+          <View style={styles.actionItem}>
+            <AppButton
+              fullWidth
+              title={
+                busyAction === "connect"
+                  ? tr("mailRedirecting")
+                  : isConnected
+                    ? tr("mailReconnect")
+                    : tr("mailConnect")
+              }
+              onPress={() => void handleConnect()}
+              disabled={busyAction !== null}
+            />
+          </View>
+          <View style={styles.actionItem}>
+            <AppButton
+              fullWidth
+              title={busyAction === "sync" ? tr("mailSyncing") : tr("mailSync")}
+              variant="ghost"
+              onPress={() => void handleSync()}
+              disabled={busyAction !== null || !canSync}
+            />
+          </View>
+          <View style={styles.actionItem}>
+            <AppButton
+              fullWidth
+              title={busyAction === "disconnect" ? tr("mailDisconnecting") : tr("mailDisconnect")}
+              variant="ghost"
+              onPress={() => void handleDisconnect()}
+              disabled={busyAction !== null || (!integration?.id && !consent)}
+            />
+          </View>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>History</Text>
+        <Text style={styles.sectionTitle}>{tr("mailSectionHistory")}</Text>
         {history.length ? (
           history.map((item) => (
             <View key={item.id} style={styles.card}>
@@ -256,11 +278,13 @@ const ImportScreen = () => {
                 {item.provider} | {item.status}
               </Text>
               <Text style={styles.meta}>
-                Started: {formatDateTime(item.startedAt)}
-                {item.finishedAt ? ` | Finished: ${formatDateTime(item.finishedAt)}` : ""}
+                {tr("mailStarted")}: {formatDateTime(item.startedAt) ?? tr("mailNotAvailable")}
+                {item.finishedAt
+                  ? ` | ${tr("mailFinished")}: ${formatDateTime(item.finishedAt) ?? tr("mailNotAvailable")}`
+                  : ""}
               </Text>
               <AppButton
-                title="View details"
+                title={tr("mailViewDetails")}
                 variant="ghost"
                 onPress={() => void handleLoadDetails(item.id)}
                 disabled={busyAction === "details"}
@@ -268,46 +292,55 @@ const ImportScreen = () => {
             </View>
           ))
         ) : (
-          <Text style={styles.meta}>{isLoading ? "Loading..." : "No import jobs."}</Text>
+          <Text style={styles.meta}>{isLoading ? tr("mailLoadingState") : tr("mailNoJobs")}</Text>
         )}
       </View>
 
       {result ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Result #{result.jobId}</Text>
+          <Text style={styles.sectionTitle}>{tr("mailSectionResult")} #{result.jobId}</Text>
           <View style={styles.card}>
-            <Text style={styles.itemTitle}>Status: {result.status}</Text>
-            <Text style={styles.meta}>
-              Processed: {result.processed} | Created: {result.created} | Skipped: {result.skipped} | Errors: {result.errors}
+            <Text style={styles.itemTitle}>
+              {tr("mailStatus")}: {result.status}
             </Text>
-            <Text style={styles.meta}>Started: {formatDateTime(result.startedAt)}</Text>
-            <Text style={styles.meta}>Finished: {formatDateTime(result.finishedAt)}</Text>
+            <Text style={styles.meta}>
+              {tr("mailProcessed")}: {result.processed} | {tr("mailCreated")}: {result.created} | {tr("mailSkipped")}:{" "}
+              {result.skipped} | {tr("mailErrors")}: {result.errors}
+            </Text>
+            <Text style={styles.meta}>
+              {tr("mailStarted")}: {formatDateTime(result.startedAt) ?? tr("mailNotAvailable")}
+            </Text>
+            <Text style={styles.meta}>
+              {tr("mailFinished")}: {formatDateTime(result.finishedAt) ?? tr("mailNotAvailable")}
+            </Text>
           </View>
 
           {result.items.length ? (
             result.items.map((item) => (
               <View key={`${item.externalId}-${item.status}`} style={styles.card}>
                 <Text style={styles.itemTitle}>{getItemSummary(item)}</Text>
-                <Text style={styles.meta}>Status: {item.status}</Text>
+                <Text style={styles.meta}>{tr("mailStatus")}: {item.status}</Text>
                 <Text style={styles.meta}>
-                  Source: {item.sourceProvider ?? "Unknown"}
-                  {item.receivedAt ? ` | Received: ${formatDateTime(item.receivedAt)}` : ""}
+                  {tr("mailSource")}: {item.sourceProvider ?? tr("mailUnknown")}
+                  {item.receivedAt
+                    ? ` | ${tr("mailReceived")}: ${formatDateTime(item.receivedAt) ?? tr("mailNotAvailable")}`
+                    : ""}
                 </Text>
                 <Text style={styles.meta}>
-                  {item.billingPeriod ?? "Period unknown"}
-                  {item.nextBillingDate ? ` | Next billing: ${item.nextBillingDate}` : ""}
+                  {item.billingPeriod ?? tr("mailPeriodUnknown")}
+                  {item.nextBillingDate ? ` | ${tr("mailNextBilling")}: ${item.nextBillingDate}` : ""}
                 </Text>
-                {item.reason ? <Text style={styles.meta}>Reason: {item.reason}</Text> : null}
+                {item.reason ? <Text style={styles.meta}>{tr("mailReason")}: {item.reason}</Text> : null}
               </View>
             ))
           ) : null}
 
           {result.errorItems.length ? (
             <>
-              <Text style={styles.sectionTitle}>Errors</Text>
+              <Text style={styles.sectionTitle}>{tr("mailErrors")}</Text>
               {result.errorItems.map((item: ImportErrorItem) => (
                 <View key={`${item.externalId ?? "message"}-${item.reason}`} style={styles.card}>
-                  <Text style={styles.itemTitle}>{item.externalId ?? "message"}</Text>
+                  <Text style={styles.itemTitle}>{item.externalId ?? tr("mailMessage")}</Text>
                   <Text style={styles.meta}>{item.reason}</Text>
                 </View>
               ))}
@@ -355,7 +388,11 @@ const createStyles = (colors: AppPalette) =>
     },
     actions: {
       flexDirection: "row",
-      gap: 8
+      flexWrap: "wrap",
+      gap: 10
+    },
+    actionItem: {
+      width: "100%"
     },
     error: {
       color: colors.danger

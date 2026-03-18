@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { categoryApi } from "../api/categoryApi";
 import { ApiError } from "../api/httpClient";
-
+import { notificationApi } from "../api/notificationApi";
 import { subscriptionApi } from "../api/subscriptionApi";
 import AppButton from "../components/AppButton";
 import { useI18n } from "../context/SettingsContext";
 import type { Category } from "../types/category";
+import type { NotificationItem } from "../types/notification";
 import type { SubscriptionStatus, UpcomingSubscription } from "../types/subscription";
 import type { AppPalette } from "../theme/theme";
 
@@ -18,6 +18,7 @@ const UpcomingScreen = () => {
   const styles = createStyles(colors);
   const [days, setDays] = useState(7);
   const [items, setItems] = useState<UpcomingSubscription[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,11 +34,13 @@ const UpcomingScreen = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const [upcomingResponse, categoriesResponse] = await Promise.all([
+      const [upcomingResponse, notificationsResponse, categoriesResponse] = await Promise.all([
         subscriptionApi.getUpcoming(targetDays),
+        notificationApi.getByDays(targetDays),
         categoryApi.getAll()
       ]);
       setItems(upcomingResponse);
+      setNotifications(notificationsResponse);
       setCategories(categoriesResponse);
     } catch (loadError) {
 
@@ -78,7 +81,8 @@ const UpcomingScreen = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{tr("tabUpcoming")}</Text>
+      <Text style={styles.title}>{tr("tabSchedule")}</Text>
+      <Text style={styles.meta}>{tr("scheduleSubtitle")}</Text>
       <View style={styles.row}>
         {dayOptions.map((option) => (
           <TouchableOpacity
@@ -93,8 +97,19 @@ const UpcomingScreen = () => {
       <Text style={styles.meta}>
         {tr("days")}: {days}
       </Text>
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>{tr("upcomingChargesTitle")}</Text>
+          <Text style={styles.summaryValue}>{items.length}</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>{tr("events")}</Text>
+          <Text style={styles.summaryValue}>{notifications.length}</Text>
+        </View>
+      </View>
       {isLoading ? <Text style={styles.meta}>{tr("loading")}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      <Text style={styles.sectionTitle}>{tr("upcomingChargesTitle")}</Text>
       {items.length === 0 && !isLoading ? <Text style={styles.meta}>{tr("noUpcomingCharges")}</Text> : null}
       {items.map((item) => (
         <View key={item.id} style={styles.card}>
@@ -111,25 +126,46 @@ const UpcomingScreen = () => {
             {tr("dayShort")}
           </Text>
           <View style={styles.actions}>
-            <AppButton
-              disabled={busyId === item.id || item.status === "PAUSED"}
-              title={tr("pause")}
-              variant="ghost"
-              onPress={() => void onQuickStatusChange(item, "PAUSED")}
-            />
-            <AppButton
-              disabled={busyId === item.id || item.status === "CANCELED"}
-              title={tr("cancel")}
-              variant="ghost"
-              onPress={() => void onQuickStatusChange(item, "CANCELED")}
-            />
-            <AppButton
-              disabled={busyId === item.id || item.status === "ACTIVE"}
-              title={tr("activate")}
-              onPress={() => void onQuickStatusChange(item, "ACTIVE")}
-            />
-
+            <View style={styles.actionItem}>
+              <AppButton
+                fullWidth
+                disabled={busyId === item.id || item.status === "PAUSED"}
+                title={tr("pause")}
+                variant="ghost"
+                onPress={() => void onQuickStatusChange(item, "PAUSED")}
+              />
+            </View>
+            <View style={styles.actionItem}>
+              <AppButton
+                fullWidth
+                disabled={busyId === item.id || item.status === "CANCELED"}
+                title={tr("cancel")}
+                variant="ghost"
+                onPress={() => void onQuickStatusChange(item, "CANCELED")}
+              />
+            </View>
+            <View style={styles.actionItem}>
+              <AppButton
+                fullWidth
+                disabled={busyId === item.id || item.status === "ACTIVE"}
+                title={tr("activate")}
+                onPress={() => void onQuickStatusChange(item, "ACTIVE")}
+              />
+            </View>
           </View>
+        </View>
+      ))}
+
+      <Text style={styles.sectionTitle}>{tr("reminderEventsTitle")}</Text>
+      {notifications.length === 0 && !isLoading ? <Text style={styles.meta}>{tr("noReminderEvents")}</Text> : null}
+      {notifications.map((item) => (
+        <View key={item.id} style={styles.card}>
+          <Text style={styles.cardTitle}>{item.message}</Text>
+          <Text style={styles.meta}>{item.type}</Text>
+          <Text style={styles.meta}>{item.scheduledAt}</Text>
+          <Text style={styles.meta}>
+            {tr("status")}: {item.status}
+          </Text>
         </View>
       ))}
     </ScrollView>
@@ -151,6 +187,31 @@ const createStyles = (colors: AppPalette) =>
     row: {
       flexDirection: "row",
       gap: 8
+    },
+    summaryRow: {
+      flexDirection: "row",
+      gap: 10
+    },
+    summaryCard: {
+      flex: 1,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+      padding: 12,
+      gap: 4
+    },
+    summaryLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      textTransform: "uppercase",
+      fontWeight: "800",
+      letterSpacing: 0.6
+    },
+    summaryValue: {
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: "900"
     },
     pill: {
       flex: 1,
@@ -184,12 +245,22 @@ const createStyles = (colors: AppPalette) =>
       color: colors.text,
       fontWeight: "800"
     },
+    sectionTitle: {
+      color: colors.text,
+      fontWeight: "800",
+      textTransform: "uppercase",
+      letterSpacing: 0.6
+    },
     meta: {
       color: colors.textMuted
     },
     actions: {
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: 8
+    },
+    actionItem: {
+      width: "100%"
     },
     error: {
       color: colors.danger
