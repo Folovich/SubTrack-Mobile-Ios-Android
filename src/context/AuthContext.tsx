@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { authApi } from "../api/authApi";
 import { setAuthToken, setUnauthorizedHandler } from "../api/httpClient";
+import { userApi } from "../api/userApi";
 import { profileStorage } from "../storage/profileStorage";
 import { tokenStorage } from "../storage/tokenStorage";
 import type { AuthCredentials, RegisterPayload } from "../types/auth";
@@ -37,10 +38,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           tokenStorage.getToken(),
           profileStorage.getProfileName()
         ]);
-        if (isMounted) {
-          setIsAuthenticated(Boolean(token));
-          setAuthToken(token);
-          setProfileName(savedName);
+
+        if (!token) {
+          if (isMounted) {
+            setIsAuthenticated(false);
+            setAuthToken(null);
+            setProfileName(savedName);
+          }
+          return;
+        }
+
+        setAuthToken(token);
+
+        try {
+          await userApi.getMe();
+          if (isMounted) {
+            setIsAuthenticated(true);
+            setProfileName(savedName);
+          }
+        } catch {
+          await Promise.all([tokenStorage.clearToken(), profileStorage.clearProfileName()]);
+          setAuthToken(null);
+          if (isMounted) {
+            setIsAuthenticated(false);
+            setProfileName(null);
+          }
         }
       } finally {
         if (isMounted) {
@@ -72,6 +94,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { token } = await authApi.login(payload);
         await tokenStorage.setToken(token);
         setAuthToken(token);
+        await profileStorage.clearProfileName();
+        setProfileName(null);
         setIsAuthenticated(true);
       },
       signUp: async (payload: RegisterPayload) => {
@@ -81,6 +105,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const nextName = payload.name?.trim() || null;
         if (nextName) {
           await profileStorage.setProfileName(nextName);
+        } else {
+          await profileStorage.clearProfileName();
         }
         setProfileName(nextName);
         setIsAuthenticated(true);

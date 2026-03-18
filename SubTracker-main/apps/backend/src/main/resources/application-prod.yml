@@ -1,0 +1,21 @@
+﻿spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+logging:
+  level:
+    root: INFO
+
+app:
+  integrations:
+    security:
+      oauth-state-cleanup:
+        enabled: true
+    gmail:
+      startup-validation-enabled: ${IMPORT_PROVIDERS_GMAIL_MAILBOX_STARTUP_VALIDATION_ENABLED:true}

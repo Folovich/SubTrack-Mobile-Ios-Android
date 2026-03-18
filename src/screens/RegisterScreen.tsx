@@ -15,9 +15,9 @@ const RegisterScreen = () => {
   const { signUp } = useAuth();
   const { tr, colors } = useI18n();
   const styles = createStyles(colors);
-  const [name, setName] = useState("Demo User");
-  const [email, setEmail] = useState("demo@subtrack.app");
-  const [password, setPassword] = useState("demo1234");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,6 +85,7 @@ const RegisterScreen = () => {
           onPress={() => setShowPassword((prev) => !prev)}
         />
       </View>
+      <Text style={styles.hint}>{tr("passwordRequirements")}</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.action}>
         <AppButton
@@ -180,6 +181,12 @@ const createStyles = (colors: AppPalette) =>
   error: {
     width: "100%",
     color: colors.danger
+  },
+  hint: {
+    width: "100%",
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18
   },
   link: {
     color: colors.accent,

@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:${DB_URL:jdbc:postgresql://localhost:5432/subtrack}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:subtrack}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:subtrack}}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+server:
+  port: ${SERVER_PORT:${BACKEND_PORT:8080}}
+
+app:
+  integrations:
+    gmail:
+      startup-validation-enabled: ${IMPORT_PROVIDERS_GMAIL_MAILBOX_STARTUP_VALIDATION_ENABLED:false}
+
+import:
+  providers:
+    gmail:
+      enabled: ${IMPORT_PROVIDERS_GMAIL_ENABLED:true}
+      mailbox-enabled: ${IMPORT_PROVIDERS_GMAIL_MAILBOX_ENABLED:true}

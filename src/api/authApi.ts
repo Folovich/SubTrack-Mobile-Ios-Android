@@ -7,6 +7,7 @@ type RawAuthResponse = {
   accessToken?: string;
   jwt?: string;
   jwtToken?: string;
+  user?: AuthResponse["user"];
 };
 
 const extractToken = (data: RawAuthResponse): string => {
@@ -45,16 +46,17 @@ const postAuth = async <T>(paths: string[], payload: unknown): Promise<T> => {
 
 export const authApi = {
   login: async (payload: AuthCredentials): Promise<AuthResponse> => {
-
-    const data = await postAuth<RawAuthResponse>(["/api/v1/auth/login", "/auth/login"], payload);
-    return { token: extractToken(data) };
+    const data = await postAuth<RawAuthResponse>(["/api/v1/auth/login", "/auth/login"], {
+      email: payload.email.trim().toLowerCase(),
+      password: payload.password
+    });
+    return { token: extractToken(data), user: data.user };
   },
   register: async (payload: RegisterPayload): Promise<AuthResponse> => {
     const data = await postAuth<RawAuthResponse>(["/api/v1/auth/register", "/auth/register"], {
-
-      email: payload.email,
+      email: payload.email.trim().toLowerCase(),
       password: payload.password
     });
-    return { token: extractToken(data) };
+    return { token: extractToken(data), user: data.user };
   }
 };
