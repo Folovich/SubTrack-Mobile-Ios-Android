@@ -93,6 +93,7 @@ const ImportScreen = () => {
   const isConnected = integration?.status === "ACTIVE";
   const needsReauth = integration?.status === "REAUTH_REQUIRED";
   const canSync = consent?.status === "GRANTED" && isConnected;
+  const connectedCount = isConnected ? 1 : 0;
 
   const connectionHint = useMemo(() => {
     if (needsReauth) {
@@ -193,13 +194,26 @@ const ImportScreen = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{tr("mailTitle")}</Text>
-      <Text style={styles.meta}>{tr("mailSubtitle")}</Text>
+      <View style={styles.hero}>
+        <Text style={styles.title}>{tr("mailTitle")}</Text>
+        <Text style={styles.meta}>{tr("mailSubtitle")}</Text>
+      </View>
 
       {notice ? (
         <Text style={notice.kind === "success" ? styles.success : styles.error}>{notice.text}</Text>
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>{tr("mailConnectedCount")}</Text>
+          <Text style={styles.summaryValue}>{connectedCount}</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>{tr("mailJobsCount")}</Text>
+          <Text style={styles.summaryValue}>{history.length}</Text>
+        </View>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{tr("mailSectionConnection")}</Text>
@@ -364,6 +378,39 @@ const createStyles = (colors: AppPalette) =>
       fontWeight: "900",
       color: colors.text
     },
+    hero: {
+      gap: 6,
+      backgroundColor: colors.bgElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      padding: 16
+    },
+    summaryRow: {
+      flexDirection: "row",
+      gap: 10
+    },
+    summaryCard: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+      borderRadius: 16,
+      padding: 14,
+      gap: 4
+    },
+    summaryLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: "800",
+      textTransform: "uppercase",
+      letterSpacing: 0.6
+    },
+    summaryValue: {
+      color: colors.text,
+      fontSize: 28,
+      fontWeight: "900"
+    },
     section: {
       gap: 8,
       backgroundColor: colors.bgElevated,
@@ -381,7 +428,7 @@ const createStyles = (colors: AppPalette) =>
     card: {
       borderWidth: 1,
       borderColor: colors.border,
-      backgroundColor: colors.bgSoft,
+      backgroundColor: colors.card,
       borderRadius: 14,
       padding: 12,
       gap: 6

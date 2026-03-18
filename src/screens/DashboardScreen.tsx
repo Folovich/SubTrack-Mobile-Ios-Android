@@ -1,21 +1,29 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { ApiError } from "../api/httpClient";
 import { dashboardApi } from "../api/dashboardApi";
+import { importApi } from "../api/importApi";
 import { userApi } from "../api/userApi";
 import type { DashboardResponse } from "../types/dashboard";
+import type { MainTabsParamList } from "../types/navigation";
 import type { UserProfile } from "../types/user";
 import { useAuth } from "../hooks/useAuth";
 import { useI18n } from "../context/SettingsContext";
 import AppButton from "../components/AppButton";
 import type { AppPalette } from "../theme/theme";
 
+type DashboardNavigationProp = BottomTabNavigationProp<MainTabsParamList, "Dashboard">;
+
 const DashboardScreen = () => {
+  const navigation = useNavigation<DashboardNavigationProp>();
   const { profileName } = useAuth();
   const { tr, colors } = useI18n();
   const styles = createStyles(colors);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [mailConnected, setMailConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,16 +31,18 @@ const DashboardScreen = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const [profileResponse, dashboardResponse] = await Promise.all([
+      const [profileResponse, dashboardResponse, integrationResponse] = await Promise.all([
         userApi.getMe(),
-        dashboardApi.getDashboard("month", 7)
+        dashboardApi.getDashboard("month", 7),
+        importApi.getIntegrationStatus()
       ]);
       setProfile(profileResponse);
       setDashboard(dashboardResponse);
+      setMailConnected(integrationResponse.status === "ACTIVE");
     } catch (loadError) {
       const message =
         loadError instanceof ApiError && loadError.status === 400
-          ? "Invalid dashboard params: period/days."
+          ? tr("dashboardPeriodError")
           : loadError instanceof Error
             ? loadError.message
             : tr("failedLoadDashboard");
@@ -40,7 +50,7 @@ const DashboardScreen = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [tr]);
 
   useEffect(() => {
     void loadDashboard();
@@ -49,11 +59,12 @@ const DashboardScreen = () => {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.hero}>
-        <Text style={styles.kicker}>Control center</Text>
-        <Text style={styles.title}>{tr("dashboardTitle")}</Text>
+        <Text style={styles.kicker}>{tr("dashboardKicker")}</Text>
+        <Text style={styles.title}>{tr("tabOverview")}</Text>
         <Text style={styles.subtitle}>
           {profile ? `${tr("signedInAs")} ${profile.email}` : tr("loadingProfile")}
         </Text>
+        <Text style={styles.heroMeta}>{tr("dashboardSubtitle")}</Text>
         {profileName ? <Text style={styles.nameTag}>{tr("name")}: {profileName}</Text> : null}
       </View>
 
@@ -70,6 +81,33 @@ const DashboardScreen = () => {
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>{tr("activeSubscriptions")}</Text>
               <Text style={styles.statValue}>{dashboard.summary.activeSubscriptions}</Text>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{tr("quickActions")}</Text>
+            <View style={styles.quickGrid}>
+              <Pressable style={styles.quickCard} onPress={() => navigation.navigate("Subscriptions")}>
+                <Text style={styles.quickTitle}>{tr("openSubscriptions")}</Text>
+                <Text style={styles.quickMeta}>{tr("list")}</Text>
+              </Pressable>
+              <Pressable style={styles.quickCard} onPress={() => navigation.navigate("Upcoming")}>
+                <Text style={styles.quickTitle}>{tr("openSchedule")}</Text>
+                <Text style={styles.quickMeta}>{dashboard.upcoming.length} {tr("upcomingChargesTitle").toLowerCase()}</Text>
+              </Pressable>
+              <Pressable style={[styles.quickCard, styles.quickCardWide]} onPress={() => navigation.navigate("Import")}>
+                <View style={styles.quickHeader}>
+                  <Text style={styles.quickTitle}>{tr("openMail")}</Text>
+                  <View style={[styles.mailBadge, mailConnected ? styles.mailBadgeActive : null]}>
+                    <Text style={[styles.mailBadgeText, mailConnected ? styles.mailBadgeTextActive : null]}>
+                      {mailConnected ? tr("dashboardConnected") : tr("dashboardNotConnected")}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.quickMeta}>
+                  {mailConnected ? tr("dashboardReadyToSync") : tr("dashboardNeedsSetup")}
+                </Text>
+              </Pressable>
             </View>
           </View>
 
@@ -159,6 +197,10 @@ const createStyles = (colors: AppPalette) =>
   subtitle: {
     color: colors.textMuted
   },
+  heroMeta: {
+    color: colors.textMuted,
+    lineHeight: 20
+  },
   nameTag: {
     alignSelf: "flex-start",
     backgroundColor: colors.accent,
@@ -208,6 +250,56 @@ const createStyles = (colors: AppPalette) =>
     borderColor: colors.border,
     borderRadius: 16,
     padding: 16
+  },
+  quickGrid: {
+    gap: 10
+  },
+  quickCard: {
+    gap: 6,
+    backgroundColor: colors.bgSoft,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  quickCardWide: {
+    backgroundColor: colors.card
+  },
+  quickHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  quickTitle: {
+    color: colors.text,
+    fontWeight: "800",
+    fontSize: 16
+  },
+  quickMeta: {
+    color: colors.textMuted
+  },
+  mailBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgElevated
+  },
+  mailBadgeActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent
+  },
+  mailBadgeText: {
+    color: colors.textMuted,
+    fontWeight: "800",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.5
+  },
+  mailBadgeTextActive: {
+    color: colors.accentText
   },
   sectionTitle: {
     color: colors.text,

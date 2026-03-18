@@ -63,6 +63,10 @@ const SubscriptionsScreen = () => {
   const [supportDraft, setSupportDraft] = useState<SupportEmailDraftResponse | null>(null);
   const [supportServiceName, setSupportServiceName] = useState("");
   const [supportMessage, setSupportMessage] = useState<string | null>(null);
+  const activeSubscriptionsCount = useMemo(
+    () => subscriptions.filter((subscription) => subscription.status === "ACTIVE").length,
+    [subscriptions]
+  );
 
   const currentCategoryName = useMemo(
     () => categories.find((item) => item.id === form.categoryId)?.name ?? tr("none"),
@@ -189,6 +193,13 @@ const SubscriptionsScreen = () => {
       status: subscription.status,
       categoryId
     });
+    setIsFormOpen(true);
+  };
+
+  const onCreatePress = () => {
+    setSelectedSubscription(null);
+    setEditingId(null);
+    setForm(initialForm);
     setIsFormOpen(true);
   };
 
@@ -325,89 +336,33 @@ const SubscriptionsScreen = () => {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>{tr("subscriptionsTitle")}</Text>
+        <View style={styles.hero}>
+          <Text style={styles.title}>{tr("subscriptionsTitle")}</Text>
+          <Text style={styles.meta}>{tr("subscriptionsSubtitle")}</Text>
+        </View>
         {isLoading ? <Text style={styles.meta}>{tr("loading")}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>{tr("subscriptionsCount")}</Text>
+            <Text style={styles.summaryValue}>{subscriptions.length}</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>{tr("activeCount")}</Text>
+            <Text style={styles.summaryValue}>{activeSubscriptionsCount}</Text>
+          </View>
+        </View>
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {editingId ? `${tr("editWithId")}${editingId}` : tr("createSubscription")}
-          </Text>
-          <TextInput
-            placeholder={tr("serviceName")}
-            style={styles.input}
-            value={form.serviceName}
-            onChangeText={(value) => setForm((prev) => ({ ...prev, serviceName: value }))}
-          />
-          <TextInput
-            placeholder={tr("amount")}
-            keyboardType="numeric"
-            style={styles.input}
-            value={String(form.amount)}
-            onChangeText={(value) =>
-              setForm((prev) => ({ ...prev, amount: Number(value.replace(",", ".")) || 0 }))
-            }
-          />
-          <Text style={styles.label}>{tr("currency")}</Text>
+          <Text style={styles.sectionTitle}>{tr("manageSubscription")}</Text>
           <View style={styles.row}>
-            {currencies.map((currency) => (
-              <TouchableOpacity
-                key={currency.code}
-                style={[styles.pill, form.currency === currency.code ? styles.pillActive : null]}
-                onPress={() => setForm((prev) => ({ ...prev, currency: currency.code }))}
-              >
-                <Text>{currency.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TextInput
-            placeholder={tr("nextBillingDate")}
-            style={styles.input}
-            value={form.nextBillingDate}
-            onChangeText={(value) => setForm((prev) => ({ ...prev, nextBillingDate: value }))}
-          />
-
-          <Text style={styles.label}>{tr("billingPeriod")}: {formatBillingPeriod(form.billingPeriod)}</Text>
-          <View style={styles.row}>
-            {billingPeriods.map((period) => (
-              <TouchableOpacity
-                key={period}
-                style={[styles.pill, form.billingPeriod === period ? styles.pillActive : null]}
-                onPress={() => setForm((prev) => ({ ...prev, billingPeriod: period }))}
-              >
-                <Text>{formatBillingPeriod(period)}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.label}>{tr("category")}: {currentCategoryName}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-            <TouchableOpacity
-              style={[styles.pill, form.categoryId == null ? styles.pillActive : null]}
-              onPress={() => setForm((prev) => ({ ...prev, categoryId: null }))}
-            >
-              <Text>{tr("none")}</Text>
+            <TouchableOpacity style={styles.actionButton} onPress={onCreatePress}>
+              <Text style={styles.actionButtonText}>{tr("addSubscription")}</Text>
             </TouchableOpacity>
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[styles.pill, form.categoryId === category.id ? styles.pillActive : null]}
-                onPress={() => setForm((prev) => ({ ...prev, categoryId: category.id }))}
-              >
-                <Text>{category.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <View style={styles.row}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => void onSubmit()}>
-              <Text style={styles.actionButtonText}>{editingId ? tr("update") : tr("create")}</Text>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => void loadAll()}>
+              <Text style={styles.secondaryButtonText}>{tr("reload")}</Text>
             </TouchableOpacity>
-            {editingId ? (
-              <TouchableOpacity style={styles.secondaryButton} onPress={resetForm}>
-                <Text style={styles.secondaryButtonText}>{tr("cancel")}</Text>
-              </TouchableOpacity>
-            ) : null}
           </View>
         </View>
 
@@ -448,6 +403,10 @@ const SubscriptionsScreen = () => {
               <Text>{tr("sortAmountDesc")}</Text>
             </TouchableOpacity>
           </View>
+
+          <Text style={styles.meta}>
+            {tr("resultsCount")}: {visibleSubscriptions.length}
+          </Text>
 
           {visibleSubscriptions.length === 0 ? <Text>{tr("noSubscriptions")}</Text> : null}
           {visibleSubscriptions.map((subscription) => (
@@ -499,34 +458,141 @@ const SubscriptionsScreen = () => {
           ))}
         </View>
 
-        {selectedSubscription ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{tr("detailsWithId")}{selectedSubscription.id}</Text>
-            <Text style={styles.meta}>{tr("service")}: {selectedSubscription.serviceName}</Text>
-            <Text style={styles.meta}>{tr("category")}: {selectedSubscription.category || tr("none")}</Text>
-            <Text style={styles.meta}>
-              {tr("amount")}: {selectedSubscription.amount} {selectedSubscription.currency}
-            </Text>
-            <Text style={styles.meta}>{tr("period")}: {formatBillingPeriod(selectedSubscription.billingPeriod)}</Text>
-            <Text style={styles.meta}>{tr("status")}: {formatStatus(selectedSubscription.status)}</Text>
-
-            <Text style={styles.sectionTitle}>Recommendations by category</Text>
-            <Text style={styles.meta}>
-              Category: {selectedSubscription.category || tr("none")}
-            </Text>
-            {isRecommendationsLoading ? <Text style={styles.meta}>{tr("loading")}</Text> : null}
-            {!isRecommendationsLoading && recommendations.length === 0 ? (
-              <Text style={styles.meta}>No recommendations for this category.</Text>
-            ) : null}
-            {recommendations.map((item, index) => (
-              <View key={`${item.currentService}-${item.alternativeService}-${index}`} style={styles.card}>
-                <Text style={styles.cardTitle}>{`${item.currentService} -> ${item.alternativeService}`}</Text>
-                <Text style={styles.meta}>{item.reason}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
       </ScrollView>
+
+      <Modal visible={isFormOpen} transparent animationType="fade" onRequestClose={resetForm}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.sectionTitle}>
+              {editingId ? `${tr("editWithId")}${editingId}` : tr("createSubscription")}
+            </Text>
+            <TextInput
+              placeholder={tr("serviceName")}
+              style={styles.input}
+              value={form.serviceName}
+              onChangeText={(value) => setForm((prev) => ({ ...prev, serviceName: value }))}
+            />
+            <TextInput
+              placeholder={tr("amount")}
+              keyboardType="numeric"
+              style={styles.input}
+              value={String(form.amount)}
+              onChangeText={(value) =>
+                setForm((prev) => ({ ...prev, amount: Number(value.replace(",", ".")) || 0 }))
+              }
+            />
+            <Text style={styles.label}>{tr("currency")}</Text>
+            <View style={styles.row}>
+              {currencies.map((currency) => (
+                <TouchableOpacity
+                  key={currency.code}
+                  style={[styles.pill, form.currency === currency.code ? styles.pillActive : null]}
+                  onPress={() => setForm((prev) => ({ ...prev, currency: currency.code }))}
+                >
+                  <Text>{currency.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              placeholder={tr("nextBillingDate")}
+              style={styles.input}
+              value={form.nextBillingDate}
+              onChangeText={(value) => setForm((prev) => ({ ...prev, nextBillingDate: value }))}
+            />
+
+            <Text style={styles.label}>{tr("billingPeriod")}: {formatBillingPeriod(form.billingPeriod)}</Text>
+            <View style={styles.row}>
+              {billingPeriods.map((period) => (
+                <TouchableOpacity
+                  key={period}
+                  style={[styles.pill, form.billingPeriod === period ? styles.pillActive : null]}
+                  onPress={() => setForm((prev) => ({ ...prev, billingPeriod: period }))}
+                >
+                  <Text>{formatBillingPeriod(period)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.label}>{tr("category")}: {currentCategoryName}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+              <TouchableOpacity
+                style={[styles.pill, form.categoryId == null ? styles.pillActive : null]}
+                onPress={() => setForm((prev) => ({ ...prev, categoryId: null }))}
+              >
+                <Text>{tr("none")}</Text>
+              </TouchableOpacity>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[styles.pill, form.categoryId === category.id ? styles.pillActive : null]}
+                  onPress={() => setForm((prev) => ({ ...prev, categoryId: category.id }))}
+                >
+                  <Text>{category.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.row}>
+              <TouchableOpacity style={styles.actionButton} onPress={() => void onSubmit()}>
+                <Text style={styles.actionButtonText}>{editingId ? tr("update") : tr("create")}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryButton} onPress={resetForm}>
+                <Text style={styles.secondaryButtonText}>{tr("cancel")}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={selectedSubscription !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedSubscription(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            {selectedSubscription ? (
+              <>
+                <Text style={styles.sectionTitle}>{tr("detailsWithId")}{selectedSubscription.id}</Text>
+                <Text style={styles.meta}>{tr("service")}: {selectedSubscription.serviceName}</Text>
+                <Text style={styles.meta}>{tr("category")}: {selectedSubscription.category || tr("none")}</Text>
+                <Text style={styles.meta}>
+                  {tr("amount")}: {selectedSubscription.amount} {selectedSubscription.currency}
+                </Text>
+                <Text style={styles.meta}>{tr("period")}: {formatBillingPeriod(selectedSubscription.billingPeriod)}</Text>
+                <Text style={styles.meta}>{tr("status")}: {formatStatus(selectedSubscription.status)}</Text>
+
+                <Text style={styles.sectionTitle}>{tr("recommendationsByCategory")}</Text>
+                <Text style={styles.meta}>
+                  {tr("category")}: {selectedSubscription.category || tr("none")}
+                </Text>
+                {isRecommendationsLoading ? <Text style={styles.meta}>{tr("loading")}</Text> : null}
+                {!isRecommendationsLoading && recommendations.length === 0 ? (
+                  <Text style={styles.meta}>{tr("noCategoryRecommendations")}</Text>
+                ) : null}
+                {recommendations.map((item, index) => (
+                  <View key={`${item.currentService}-${item.alternativeService}-${index}`} style={styles.card}>
+                    <Text style={styles.cardTitle}>
+                      {tr("recommendationSwap")}: {item.currentService} {"->"} {item.alternativeService}
+                    </Text>
+                    <Text style={styles.meta}>{item.reason}</Text>
+                  </View>
+                ))}
+
+                <View style={styles.row}>
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    onPress={() => setSelectedSubscription(null)}
+                  >
+                    <Text style={styles.secondaryButtonText}>{tr("closeDraft")}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={supportDraft !== null} transparent animationType="fade" onRequestClose={closeSupportDraft}>
         <View style={styles.modalBackdrop}>
@@ -593,6 +659,34 @@ const createStyles = (colors: AppPalette) =>
       fontSize: 30,
       fontWeight: "900",
       color: colors.text
+    },
+    hero: {
+      gap: 6
+    },
+    summaryRow: {
+      flexDirection: "row",
+      gap: 10
+    },
+    summaryCard: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+      borderRadius: 16,
+      padding: 14,
+      gap: 4
+    },
+    summaryLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: "800",
+      textTransform: "uppercase",
+      letterSpacing: 0.6
+    },
+    summaryValue: {
+      color: colors.text,
+      fontSize: 28,
+      fontWeight: "900"
     },
     section: {
       gap: 8,

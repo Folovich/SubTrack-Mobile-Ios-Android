@@ -46,7 +46,7 @@ const AnalyticsScreen = () => {
     } catch (loadError) {
       setError(
         loadError instanceof ApiError && loadError.status === 400
-          ? "Invalid analytics period."
+          ? tr("analyticsPeriodError")
           : loadError instanceof Error
             ? loadError.message
             : tr("failedLoadAnalytics")
@@ -69,11 +69,11 @@ const AnalyticsScreen = () => {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>{tr("analyticsTitle")}</Text>
-        <Text style={styles.title}>Spend intelligence</Text>
+        <Text style={styles.title}>{tr("analyticsTitle")}</Text>
         <Text style={styles.subtitle}>
           {summary
             ? `${summary.from} - ${summary.to}`
-            : "Track totals, category pressure and forecast for the selected period."}
+            : tr("analyticsSubtitle")}
         </Text>
       </View>
 
@@ -108,10 +108,10 @@ const AnalyticsScreen = () => {
             <Text style={styles.metricValue}>{summary.activeSubscriptions}</Text>
           </View>
           <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Top category</Text>
+            <Text style={styles.metricLabel}>{tr("analyticsTopCategory")}</Text>
             <Text style={styles.metricValueSmall}>{topCategory?.category ?? "-"}</Text>
             <Text style={styles.metricHint}>
-              {topCategory ? `${topCategory.sharePercent}% of total` : tr("noCategories")}
+              {topCategory ? `${topCategory.sharePercent}% ${tr("analyticsShareOfTotal")}` : tr("noCategories")}
             </Text>
           </View>
         </View>
@@ -148,8 +148,10 @@ const AnalyticsScreen = () => {
           {topVisualItems.length > 0 ? (
             <View style={styles.visualPanel}>
               <View style={styles.visualHeader}>
-                <Text style={styles.visualTitle}>Expense chart</Text>
-                <Text style={styles.visualMeta}>Top {topVisualItems.length} categories</Text>
+                <Text style={styles.visualTitle}>{tr("analyticsExpenseChart")}</Text>
+                <Text style={styles.visualMeta}>
+                  {tr("analyticsTopCategories")}: {topVisualItems.length}
+                </Text>
               </View>
               <View style={styles.columnsWrap}>
                 {topVisualItems.map((item, index) => {
@@ -210,7 +212,7 @@ const AnalyticsScreen = () => {
                 </View>
                 <View style={styles.chartMetaRow}>
                   <Text style={styles.meta}>{item.sharePercent}%</Text>
-                  <Text style={styles.meta}>{item.subscriptionsCount} subs</Text>
+                  <Text style={styles.meta}>{item.subscriptionsCount} {tr("subscriptionsShort")}</Text>
                 </View>
               </View>
             );
