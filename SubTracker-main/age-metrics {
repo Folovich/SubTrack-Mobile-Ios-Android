@@ -1,0 +1,26 @@
+[1mdiff --cc apps/web/src/styles.css[m
+[1mindex e0e4155,a4e086c..0000000[m
+[1m--- a/apps/web/src/styles.css[m
+[1m+++ b/apps/web/src/styles.css[m
+[36m@@@ -607,6 -1128,18 +673,21 @@@[m [mbutton [m
+      text-overflow: ellipsis;[m
+    }[m
+  [m
+[32m++<<<<<<< Updated upstream[m
+[32m++=======[m
+[32m+   .usage-metrics {[m
+[32m+     grid-template-columns: 1fr;[m
+[32m+   }[m
+[32m+ [m
+[32m+   .import-grid {[m
+[32m+     grid-template-columns: 1fr;[m
+[32m+   }[m
+[32m+ [m
+[32m+   .usage-bar-row {[m
+[32m+     grid-template-columns: 120px minmax(0, 1fr) 36px;[m
+[32m+   }[m
+[32m+ [m
+[32m++>>>>>>> Stashed changes[m
+    .auth-card {[m
+      grid-template-columns: 1fr;[m
+      width: min(100%, 560px);[m

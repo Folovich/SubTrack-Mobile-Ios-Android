@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { categoryApi } from "../api/categoryApi";
 import { ApiError } from "../api/httpClient";
 
 import { subscriptionApi } from "../api/subscriptionApi";
 import AppButton from "../components/AppButton";
 import { useI18n } from "../context/SettingsContext";
+import type { Category } from "../types/category";
 import type { SubscriptionStatus, UpcomingSubscription } from "../types/subscription";
 import type { AppPalette } from "../theme/theme";
 
@@ -16,6 +18,7 @@ const UpcomingScreen = () => {
   const styles = createStyles(colors);
   const [days, setDays] = useState(7);
   const [items, setItems] = useState<UpcomingSubscription[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -30,8 +33,12 @@ const UpcomingScreen = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const upcomingResponse = await subscriptionApi.getUpcoming(targetDays);
+      const [upcomingResponse, categoriesResponse] = await Promise.all([
+        subscriptionApi.getUpcoming(targetDays),
+        categoryApi.getAll()
+      ]);
       setItems(upcomingResponse);
+      setCategories(categoriesResponse);
     } catch (loadError) {
 
       setError(loadError instanceof ApiError ? loadError.message : tr("failedLoadSubscriptions"));
@@ -49,9 +56,10 @@ const UpcomingScreen = () => {
     try {
       setBusyId(item.id);
       setError(null);
+      const categoryId = categories.find((category) => category.name === item.category)?.id ?? null;
       await subscriptionApi.update(item.id, {
         serviceName: item.serviceName,
-        categoryId: null,
+        categoryId,
         amount: item.amount,
         currency: item.currency,
         billingPeriod: item.billingPeriod,
@@ -105,7 +113,7 @@ const UpcomingScreen = () => {
           <View style={styles.actions}>
             <AppButton
               disabled={busyId === item.id || item.status === "PAUSED"}
-              title="Pause"
+              title={tr("pause")}
               variant="ghost"
               onPress={() => void onQuickStatusChange(item, "PAUSED")}
             />
@@ -117,7 +125,7 @@ const UpcomingScreen = () => {
             />
             <AppButton
               disabled={busyId === item.id || item.status === "ACTIVE"}
-              title="Activate"
+              title={tr("activate")}
               onPress={() => void onQuickStatusChange(item, "ACTIVE")}
             />
 

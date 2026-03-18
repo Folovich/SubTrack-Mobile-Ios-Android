@@ -33,14 +33,16 @@ const IntegrationsScreen = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Integrations</Text>
+      <Text style={styles.title}>{tr("tabIntegrations")}</Text>
       {isLoading ? <Text style={styles.meta}>{tr("loading")}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {items.length === 0 && !isLoading ? <Text style={styles.meta}>No integrations.</Text> : null}
+      {items.length === 0 && !isLoading ? <Text style={styles.meta}>{tr("noIntegrations")}</Text> : null}
       {items.map((item) => (
-        <View key={item.id} style={styles.card}>
+        <View key={`${item.provider}-${item.id ?? "none"}`} style={styles.card}>
           <Text style={styles.cardTitle}>{item.provider}</Text>
           <Text style={styles.meta}>{tr("status")}: {item.status}</Text>
+          {item.externalAccountEmail ? <Text style={styles.meta}>{item.externalAccountEmail}</Text> : null}
+          {item.lastSyncAt ? <Text style={styles.meta}>Last sync: {item.lastSyncAt}</Text> : null}
         </View>
       ))}
       <AppButton title={tr("reload")} fullWidth onPress={() => void load()} />

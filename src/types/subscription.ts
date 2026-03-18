@@ -1,5 +1,7 @@
 export type BillingPeriod = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
 export type SubscriptionStatus = "ACTIVE" | "PAUSED" | "CANCELED";
+export type SupportEmailAction = "CANCEL" | "PAUSE";
+export type SupportEmailEvent = "DRAFT_OPENED" | "MAILTO_OPENED" | "TEXT_COPIED";
 
 export interface SubscriptionRequest {
   serviceName: string;
@@ -24,4 +26,19 @@ export interface Subscription {
 
 export interface UpcomingSubscription extends Subscription {
   daysUntilBilling: number;
+}
+
+export interface SupportEmailDraftDetails {
+  to: string;
+  subject: string;
+  body: string;
+  mailtoUrl: string;
+  plainTextForCopy: string;
+}
+
+export interface SupportEmailDraftResponse {
+  subscriptionId: number;
+  action: SupportEmailAction;
+  provider: string;
+  draft: SupportEmailDraftDetails;
 }

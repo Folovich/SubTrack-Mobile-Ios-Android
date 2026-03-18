@@ -1,346 +1,318 @@
+import axios from "axios";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { consentApi, type ImportConsentStatus } from "../api/consentApi";
-import { ApiError } from "../api/httpClient";
-import { integrationApi } from "../api/integrationApi";
+import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { importApi } from "../api/importApi";
 import AppButton from "../components/AppButton";
 import { useI18n } from "../context/SettingsContext";
+import type {
+  ImportConsentStatus,
+  ImportErrorItem,
+  ImportHistoryItem,
+  ImportItemResult,
+  ImportResult,
+  IntegrationStatus
+} from "../types/import";
 import type { AppPalette } from "../theme/theme";
-import type { ImportHistoryItem, ImportResult, MailMessageRequest } from "../types/import";
-import type { IntegrationConnection } from "../types/integration";
 
-const IMPORT_PROVIDER = "GMAIL";
-
-type ImportConsentErrorPayload = {
-  code?: string;
-  provider?: string;
-  message?: string;
-};
-
-const getImportConsentError = (error: ApiError): ImportConsentErrorPayload | null => {
-  const details = error.details as ImportConsentErrorPayload | undefined;
-  if (error.status === 403 && details?.code === "IMPORT_CONSENT_REQUIRED") {
-    return details;
+const formatDateTime = (value: string | null) => {
+  if (!value) {
+    return "Not available";
   }
 
-  return null;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (axios.isAxiosError<{ message?: string; errors?: Record<string, string> }>(error)) {
+    const fieldError = error.response?.data?.errors
+      ? Object.values(error.response.data.errors)[0]
+      : null;
+
+    return fieldError ?? error.response?.data?.message ?? "Request failed";
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unexpected error";
+};
+
+const getItemSummary = (item: ImportItemResult) => {
+  if (item.serviceName && item.amount && item.currency) {
+    return `${item.serviceName} | ${item.amount.toFixed(2)} ${item.currency}`;
+  }
+
+  if (item.serviceName) {
+    return item.serviceName;
+  }
+
+  return item.externalId;
 };
 
 const ImportScreen = () => {
   const { colors } = useI18n();
   const styles = createStyles(colors);
-  const [history, setHistory] = useState<ImportHistoryItem[]>([]);
-  const [details, setDetails] = useState<ImportResult | null>(null);
-  const [integrations, setIntegrations] = useState<IntegrationConnection[]>([]);
   const [consent, setConsent] = useState<ImportConsentStatus | null>(null);
-  const [pendingRetryPayload, setPendingRetryPayload] = useState<MailMessageRequest | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isConsentLoading, setIsConsentLoading] = useState(true);
-  const [isConsentUpdating, setIsConsentUpdating] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [integration, setIntegration] = useState<IntegrationStatus | null>(null);
+  const [history, setHistory] = useState<ImportHistoryItem[]>([]);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const [subject, setSubject] = useState("Subscription renewal");
-  const [fromEmail, setFromEmail] = useState("billing@example.com");
+  const [isLoading, setIsLoading] = useState(true);
+  const [busyAction, setBusyAction] = useState<"connect" | "sync" | "disconnect" | "details" | null>(null);
 
-  const hasGrantedConsent = consent?.status === "GRANTED";
-  const canSubmit = useMemo(
-    () => Boolean(message.trim() && subject.trim() && fromEmail.trim() && hasGrantedConsent),
-    [fromEmail, hasGrantedConsent, message, subject]
-  );
+  const loadImportPage = useCallback(async () => {
+    setError(null);
+    setIsLoading(true);
 
-  const loadHistory = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      const response = await importApi.getHistory();
-      setHistory(response);
-    } catch (historyError) {
-      setError(
-        historyError instanceof ApiError && historyError.status === 400
-          ? "Invalid import history request."
-          : historyError instanceof Error
-            ? historyError.message
-            : "Failed to load import history."
-      );
+      const [consentResponse, integrationResponse, historyResponse] = await Promise.all([
+        importApi.getConsentStatus(),
+        importApi.getIntegrationStatus(),
+        importApi.getHistory()
+      ]);
+
+      setConsent(consentResponse);
+      setIntegration(integrationResponse);
+      setHistory(historyResponse);
+    } catch (loadError) {
+      setError(getErrorMessage(loadError));
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const loadConsentStatus = useCallback(async () => {
-    try {
-      setIsConsentLoading(true);
-      const status = await consentApi.getImportConsentStatus(IMPORT_PROVIDER);
-      setConsent(status);
-    } catch (consentError) {
-      setError(
-        consentError instanceof Error
-          ? consentError.message
-          : "Failed to load import consent status."
-      );
-    } finally {
-      setIsConsentLoading(false);
-    }
-  }, []);
-
-  const loadIntegrations = useCallback(async () => {
-    try {
-      const response = await integrationApi.getAll();
-      setIntegrations(response);
-    } catch (integrationError) {
-      setError(
-        integrationError instanceof Error
-          ? integrationError.message
-          : "Failed to load integrations."
-      );
-    }
-  }, []);
-
   useEffect(() => {
-    void loadHistory();
-    void loadConsentStatus();
-    void loadIntegrations();
-  }, [loadConsentStatus, loadHistory, loadIntegrations]);
+    void loadImportPage();
+  }, [loadImportPage]);
 
-  const runImport = useCallback(
-    async (payload: MailMessageRequest) => {
-      const result = await importApi.start({
-        provider: IMPORT_PROVIDER,
-        messages: [payload]
-      });
-      setDetails(result);
-      setPendingRetryPayload(null);
-      await loadHistory();
-    },
-    [loadHistory]
-  );
+  const isConnected = integration?.status === "ACTIVE";
+  const needsReauth = integration?.status === "REAUTH_REQUIRED";
+  const canSync = consent?.status === "GRANTED" && isConnected;
 
-  const handleImportError = useCallback((startError: unknown, payload: MailMessageRequest) => {
-    if (startError instanceof ApiError) {
-      const consentError = getImportConsentError(startError);
-      if (consentError) {
-        setPendingRetryPayload(payload);
-        setConsent((prev) => ({
-          provider: IMPORT_PROVIDER,
-          status: "NOT_GRANTED",
-          scope: prev?.scope,
-          grantedAt: prev?.grantedAt ?? null,
-          revokedAt: prev?.revokedAt ?? null,
-          integrationStatus: prev?.integrationStatus
-        }));
-        setError(consentError.message ?? "Import consent is required before import for provider GMAIL.");
-        return;
+  const connectionHint = useMemo(() => {
+    if (needsReauth) {
+      return "Google access expired or was revoked. Reconnect Gmail before the next sync.";
+    }
+    if (isConnected) {
+      return "Mailbox sync will fetch relevant billing emails directly from Gmail with read-only access.";
+    }
+    if (consent?.status === "GRANTED") {
+      return "Consent exists, but mailbox is not connected yet. Finish Gmail OAuth to enable sync.";
+    }
+    return "Connect Gmail to grant explicit consent and import billing emails end-to-end.";
+  }, [consent?.status, isConnected, needsReauth]);
+
+  const handleConnect = async () => {
+    setError(null);
+    setNotice(null);
+    setBusyAction("connect");
+
+    try {
+      const response = await importApi.startOAuth();
+      const supported = await Linking.canOpenURL(response.authorizationUrl);
+
+      if (!supported) {
+        throw new Error("Cannot open Gmail authorization URL.");
       }
-    }
 
-    setError(
-      startError instanceof ApiError && startError.status === 400
-        ? "Import payload validation failed."
-        : startError instanceof Error
-          ? startError.message
-          : "Failed to start import."
-    );
-  }, []);
-
-  const onStartImport = async () => {
-    if (!hasGrantedConsent) {
-      setError("Import consent is required before import. Tap \"Grant consent\" to continue.");
-      return;
-    }
-
-    const payload: MailMessageRequest = {
-      externalId: `manual-${Date.now()}`,
-      from: fromEmail.trim(),
-      subject: subject.trim(),
-      body: message.trim(),
-      receivedAt: new Date().toISOString()
-    };
-
-    try {
-      setError(null);
-      setIsSubmitting(true);
-      await runImport(payload);
-    } catch (startError) {
-      handleImportError(startError, payload);
-    } finally {
-      setIsSubmitting(false);
+      await Linking.openURL(response.authorizationUrl);
+    } catch (connectError) {
+      setError(getErrorMessage(connectError));
+      setBusyAction(null);
     }
   };
 
-  const onGrantConsent = async () => {
-    try {
-      setError(null);
-      setIsConsentUpdating(true);
-      const status = await consentApi.grantImportConsent(IMPORT_PROVIDER);
-      setConsent(status);
-    } catch (grantError) {
-      setError(grantError instanceof Error ? grantError.message : "Failed to grant import consent.");
-    } finally {
-      setIsConsentUpdating(false);
-    }
-  };
-
-  const onRevokeConsent = async () => {
-    try {
-      setError(null);
-      setIsConsentUpdating(true);
-      const status = await consentApi.revokeImportConsent(IMPORT_PROVIDER);
-      setConsent(status);
-      setPendingRetryPayload(null);
-    } catch (revokeError) {
-      setError(revokeError instanceof Error ? revokeError.message : "Failed to revoke import consent.");
-    } finally {
-      setIsConsentUpdating(false);
-    }
-  };
-
-  const onGrantAndRetry = async () => {
-    if (!pendingRetryPayload) {
-      await onGrantConsent();
-      return;
-    }
+  const handleDisconnect = async () => {
+    setError(null);
+    setNotice(null);
+    setBusyAction("disconnect");
 
     try {
-      setError(null);
-      setIsConsentUpdating(true);
-      setIsSubmitting(true);
-      const status = await consentApi.grantImportConsent(IMPORT_PROVIDER);
-      setConsent(status);
-      await runImport(pendingRetryPayload);
-    } catch (retryError) {
-      setError(
-        retryError instanceof Error
-          ? retryError.message
-          : "Failed to grant consent and retry import."
+      const response = await importApi.disconnect();
+      setIntegration(response);
+      setConsent((previous) =>
+        previous
+          ? {
+              ...previous,
+              status: "REVOKED",
+              integrationStatus: response.status
+            }
+          : previous
       );
+      setResult(null);
+      await loadImportPage();
+      setNotice({
+        kind: "success",
+        text: "Gmail was disconnected and consent was revoked."
+      });
+    } catch (disconnectError) {
+      setError(getErrorMessage(disconnectError));
     } finally {
-      setIsConsentUpdating(false);
-      setIsSubmitting(false);
+      setBusyAction(null);
     }
   };
 
-  const onLoadDetails = async (id: number) => {
+  const handleSync = async () => {
+    setError(null);
+    setNotice(null);
+    setBusyAction("sync");
+
     try {
-      setError(null);
-      const result = await importApi.getById(id);
-      setDetails(result);
+      const syncResult = await importApi.syncMailbox();
+      setResult(syncResult);
+      await loadImportPage();
+      setNotice({
+        kind: "success",
+        text: `Mailbox sync finished with status ${syncResult.status}.`
+      });
+    } catch (syncError) {
+      setError(getErrorMessage(syncError));
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleLoadDetails = async (id: number) => {
+    setError(null);
+    setBusyAction("details");
+
+    try {
+      const details = await importApi.getById(id);
+      setResult(details);
     } catch (detailsError) {
-      setError(
-        detailsError instanceof ApiError && detailsError.status === 400
-          ? "Invalid import id."
-          : detailsError instanceof Error
-            ? detailsError.message
-            : "Failed to load import details."
-      );
+      setError(getErrorMessage(detailsError));
+    } finally {
+      setBusyAction(null);
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Import</Text>
-      {isLoading ? <Text style={styles.meta}>Loading history...</Text> : null}
+      <Text style={styles.meta}>
+        Connect Gmail with read-only access, sync relevant billing emails, and review which subscriptions were imported,
+        skipped, unsupported, or failed to parse.
+      </Text>
+
+      {notice ? (
+        <Text style={notice.kind === "success" ? styles.success : styles.error}>{notice.text}</Text>
+      ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Integrations</Text>
-        {integrations.length === 0 ? <Text style={styles.meta}>No integrations.</Text> : null}
-        {integrations.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <Text style={styles.itemTitle}>{item.provider}</Text>
-            <Text style={styles.meta}>Status: {item.status}</Text>
-          </View>
-        ))}
-        <AppButton fullWidth title="Reload integrations" variant="ghost" onPress={() => void loadIntegrations()} />
-      </View>
+        <Text style={styles.sectionTitle}>Gmail mailbox import</Text>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Import consent</Text>
-        {isConsentLoading ? <Text style={styles.meta}>Loading consent...</Text> : null}
-        <Text style={styles.meta}>Status: {consent?.status ?? "UNKNOWN"}</Text>
+        <View style={styles.card}>
+          <Text style={styles.itemTitle}>Consent</Text>
+          <Text style={styles.meta}>Status: {consent?.status ?? (isLoading ? "Loading..." : "Unknown")}</Text>
+          <Text style={styles.meta}>Scope: {consent?.scope ?? "Not granted yet"}</Text>
+          <Text style={styles.meta}>Granted: {formatDateTime(consent?.grantedAt ?? null)}</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.itemTitle}>Connection</Text>
+          <Text style={styles.meta}>Status: {integration?.status ?? (isLoading ? "Loading..." : "NOT_CONNECTED")}</Text>
+          <Text style={styles.meta}>Mailbox: {integration?.externalAccountEmail ?? "Not connected"}</Text>
+          <Text style={styles.meta}>Last sync: {formatDateTime(integration?.lastSyncAt ?? null)}</Text>
+        </View>
+
+        <Text style={styles.meta}>{connectionHint}</Text>
+        {integration?.lastErrorMessage ? (
+          <Text style={styles.meta}>Last Gmail error: {integration.lastErrorMessage}</Text>
+        ) : null}
+
         <View style={styles.actions}>
           <AppButton
-            title={isConsentUpdating ? "Granting..." : "Grant consent"}
-            onPress={() => void onGrantConsent()}
-            disabled={isConsentLoading || isConsentUpdating}
+            title={busyAction === "connect" ? "Redirecting..." : isConnected ? "Reconnect Gmail" : "Connect Gmail"}
+            onPress={() => void handleConnect()}
+            disabled={busyAction !== null}
           />
           <AppButton
-            title={isConsentUpdating ? "Revoking..." : "Revoke consent"}
+            title={busyAction === "sync" ? "Syncing..." : "Sync mailbox"}
             variant="ghost"
-            onPress={() => void onRevokeConsent()}
-            disabled={isConsentLoading || isConsentUpdating}
+            onPress={() => void handleSync()}
+            disabled={busyAction !== null || !canSync}
+          />
+          <AppButton
+            title={busyAction === "disconnect" ? "Disconnecting..." : "Disconnect"}
+            variant="ghost"
+            onPress={() => void handleDisconnect()}
+            disabled={busyAction !== null || (!integration?.id && !consent)}
           />
         </View>
-        {pendingRetryPayload ? (
-          <AppButton
-            fullWidth
-            title={isSubmitting ? "Retrying..." : "Grant and retry import"}
-            onPress={() => void onGrantAndRetry()}
-            disabled={isConsentLoading || isConsentUpdating || isSubmitting}
-          />
-        ) : null}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Start import (MVP)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="From"
-          placeholderTextColor={colors.textMuted}
-          value={fromEmail}
-          onChangeText={setFromEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Subject"
-          placeholderTextColor={colors.textMuted}
-          value={subject}
-          onChangeText={setSubject}
-        />
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          multiline
-          placeholder="Email body"
-          placeholderTextColor={colors.textMuted}
-          value={message}
-          onChangeText={setMessage}
-        />
-        <AppButton
-          disabled={!canSubmit || isSubmitting}
-          fullWidth
-          title={isSubmitting ? "Starting..." : "Start import"}
-          onPress={() => void onStartImport()}
-        />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>History</Text>
-        {history.length === 0 ? <Text>No import jobs.</Text> : null}
-        {history.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <Text style={styles.itemTitle}>#{item.id}</Text>
-            <Text style={styles.meta}>
-              {item.provider} | {item.status}
-            </Text>
-            <AppButton title="Details" variant="ghost" onPress={() => void onLoadDetails(item.id)} />
-          </View>
-        ))}
+        {history.length ? (
+          history.map((item) => (
+            <View key={item.id} style={styles.card}>
+              <Text style={styles.itemTitle}>
+                {item.provider} | {item.status}
+              </Text>
+              <Text style={styles.meta}>
+                Started: {formatDateTime(item.startedAt)}
+                {item.finishedAt ? ` | Finished: ${formatDateTime(item.finishedAt)}` : ""}
+              </Text>
+              <AppButton
+                title="View details"
+                variant="ghost"
+                onPress={() => void handleLoadDetails(item.id)}
+                disabled={busyAction === "details"}
+              />
+            </View>
+          ))
+        ) : (
+          <Text style={styles.meta}>{isLoading ? "Loading..." : "No import jobs."}</Text>
+        )}
       </View>
 
-      {details ? (
+      {result ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Details #{details.jobId}</Text>
-          <Text style={styles.meta}>Status: {details.status}</Text>
-          <Text style={styles.meta}>
-            Processed: {details.processed}, Created: {details.created}, Skipped: {details.skipped}, Errors: {details.errors}
-          </Text>
-          {details.errorItems.length > 0 ? <Text style={styles.sectionTitle}>Errors</Text> : null}
-          {details.errorItems.map((item) => (
-            <Text key={`${item.externalId}-${item.reason}`} style={styles.meta}>
-              {item.externalId}: {item.reason}
+          <Text style={styles.sectionTitle}>Result #{result.jobId}</Text>
+          <View style={styles.card}>
+            <Text style={styles.itemTitle}>Status: {result.status}</Text>
+            <Text style={styles.meta}>
+              Processed: {result.processed} | Created: {result.created} | Skipped: {result.skipped} | Errors: {result.errors}
             </Text>
-          ))}
+            <Text style={styles.meta}>Started: {formatDateTime(result.startedAt)}</Text>
+            <Text style={styles.meta}>Finished: {formatDateTime(result.finishedAt)}</Text>
+          </View>
+
+          {result.items.length ? (
+            result.items.map((item) => (
+              <View key={`${item.externalId}-${item.status}`} style={styles.card}>
+                <Text style={styles.itemTitle}>{getItemSummary(item)}</Text>
+                <Text style={styles.meta}>Status: {item.status}</Text>
+                <Text style={styles.meta}>
+                  Source: {item.sourceProvider ?? "Unknown"}
+                  {item.receivedAt ? ` | Received: ${formatDateTime(item.receivedAt)}` : ""}
+                </Text>
+                <Text style={styles.meta}>
+                  {item.billingPeriod ?? "Period unknown"}
+                  {item.nextBillingDate ? ` | Next billing: ${item.nextBillingDate}` : ""}
+                </Text>
+                {item.reason ? <Text style={styles.meta}>Reason: {item.reason}</Text> : null}
+              </View>
+            ))
+          ) : null}
+
+          {result.errorItems.length ? (
+            <>
+              <Text style={styles.sectionTitle}>Errors</Text>
+              {result.errorItems.map((item: ImportErrorItem) => (
+                <View key={`${item.externalId ?? "message"}-${item.reason}`} style={styles.card}>
+                  <Text style={styles.itemTitle}>{item.externalId ?? "message"}</Text>
+                  <Text style={styles.meta}>{item.reason}</Text>
+                </View>
+              ))}
+            </>
+          ) : null}
         </View>
       ) : null}
     </ScrollView>
@@ -373,23 +345,10 @@ const createStyles = (colors: AppPalette) =>
       textTransform: "uppercase",
       letterSpacing: 0.6
     },
-    input: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.bgSoft,
-      color: colors.text,
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 10
-    },
-    textArea: {
-      minHeight: 100,
-      textAlignVertical: "top"
-    },
     card: {
       borderWidth: 1,
       borderColor: colors.border,
-      backgroundColor: colors.bgElevated,
+      backgroundColor: colors.bgSoft,
       borderRadius: 14,
       padding: 12,
       gap: 6
@@ -400,6 +359,9 @@ const createStyles = (colors: AppPalette) =>
     },
     error: {
       color: colors.danger
+    },
+    success: {
+      color: colors.accent
     },
     meta: {
       color: colors.textMuted

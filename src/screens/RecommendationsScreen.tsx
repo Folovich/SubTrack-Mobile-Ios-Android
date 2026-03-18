@@ -61,7 +61,7 @@ const RecommendationsScreen = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Recommendations</Text>
+      <Text style={styles.title}>{tr("tabRecommendations")}</Text>
       {isLoading ? <Text style={styles.meta}>{tr("loading")}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -77,11 +77,11 @@ const RecommendationsScreen = () => {
         ))}
       </View>
 
-      {items.length === 0 && !isLoading ? <Text style={styles.meta}>No recommendations.</Text> : null}
+      {items.length === 0 && !isLoading ? <Text style={styles.meta}>{tr("noRecommendations")}</Text> : null}
       {items.map((item, index) => (
         <View key={`${item.currentService}-${item.alternativeService}-${index}`} style={styles.card}>
           <Text style={styles.cardTitle}>{item.category}</Text>
-          <Text style={styles.meta}>{item.currentService} → {item.alternativeService}</Text>
+          <Text style={styles.meta}>{`${item.currentService} -> ${item.alternativeService}`}</Text>
           <Text style={styles.meta}>{item.reason}</Text>
         </View>
       ))}

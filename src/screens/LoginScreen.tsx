@@ -15,8 +15,8 @@ const LoginScreen = () => {
   const { signIn } = useAuth();
   const { tr, colors } = useI18n();
   const styles = createStyles(colors);
-  const [email, setEmail] = useState("demo@subtrack.app");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -5,6 +5,8 @@ import DashboardScreen from "../screens/DashboardScreen";
 import SubscriptionsScreen from "../screens/SubscriptionsScreen";
 import UpcomingScreen from "../screens/UpcomingScreen";
 import RemindersScreen from "../screens/RemindersScreen";
+import IntegrationsScreen from "../screens/IntegrationsScreen";
+import RecommendationsScreen from "../screens/RecommendationsScreen";
 import AnalyticsScreen from "../screens/AnalyticsScreen";
 import ImportScreen from "../screens/ImportScreen";
 import SettingsScreen from "../screens/SettingsScreen";
@@ -52,8 +54,14 @@ const MainTabs = () => {
       />
       <Tab.Screen name="Upcoming" component={UpcomingScreen} options={{ title: tr("tabUpcoming") }} />
       <Tab.Screen name="Reminders" component={RemindersScreen} options={{ title: tr("tabReminders") }} />
+      <Tab.Screen name="Integrations" component={IntegrationsScreen} options={{ title: tr("tabIntegrations") }} />
+      <Tab.Screen
+        name="Recommendations"
+        component={RecommendationsScreen}
+        options={{ title: tr("tabRecommendations") }}
+      />
       <Tab.Screen name="Analytics" component={AnalyticsScreen} options={{ title: tr("tabAnalytics") }} />
-      <Tab.Screen name="Import" component={ImportScreen} options={{ title: "Import" }} />
+      <Tab.Screen name="Import" component={ImportScreen} options={{ title: tr("tabImport") }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: tr("tabSettings") }} />
     </Tab.Navigator>
   );

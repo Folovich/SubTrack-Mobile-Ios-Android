@@ -1,5 +1,12 @@
 import { httpClient } from "./httpClient";
-import type { Subscription, SubscriptionRequest, UpcomingSubscription } from "../types/subscription";
+import type {
+  Subscription,
+  SubscriptionRequest,
+  SupportEmailAction,
+  SupportEmailDraftResponse,
+  SupportEmailEvent,
+  UpcomingSubscription
+} from "../types/subscription";
 
 export const subscriptionApi = {
   getAll: async (): Promise<Subscription[]> => {
@@ -26,5 +33,25 @@ export const subscriptionApi = {
       params: { days }
     });
     return response.data;
+  },
+  getSupportEmailDraft: async (
+    id: number,
+    action: SupportEmailAction
+  ): Promise<SupportEmailDraftResponse> => {
+    const response = await httpClient.get<SupportEmailDraftResponse>(
+      `/api/v1/subscriptions/${id}/support-email-draft`,
+      { params: { action } }
+    );
+    return response.data;
+  },
+  trackSupportEmailEvent: async (
+    id: number,
+    action: SupportEmailAction,
+    event: SupportEmailEvent
+  ): Promise<void> => {
+    await httpClient.post(`/api/v1/subscriptions/${id}/support-email-events`, {
+      action,
+      event
+    });
   }
 };
