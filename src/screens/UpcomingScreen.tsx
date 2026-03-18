@@ -81,8 +81,10 @@ const UpcomingScreen = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{tr("tabSchedule")}</Text>
-      <Text style={styles.meta}>{tr("scheduleSubtitle")}</Text>
+      <View style={styles.hero}>
+        <Text style={styles.title}>{tr("tabSchedule")}</Text>
+        <Text style={styles.meta}>{tr("scheduleSubtitle")}</Text>
+      </View>
       <View style={styles.row}>
         {dayOptions.map((option) => (
           <TouchableOpacity
@@ -184,6 +186,14 @@ const createStyles = (colors: AppPalette) =>
       fontWeight: "900",
       color: colors.text
     },
+    hero: {
+      gap: 6,
+      backgroundColor: colors.bgElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      padding: 16
+    },
     row: {
       flexDirection: "row",
       gap: 8
@@ -236,7 +246,7 @@ const createStyles = (colors: AppPalette) =>
     card: {
       borderWidth: 1,
       borderColor: colors.border,
-      backgroundColor: colors.bgElevated,
+      backgroundColor: colors.card,
       borderRadius: 14,
       padding: 12,
       gap: 6
