@@ -74,9 +74,9 @@ const DashboardScreen = () => {
       {dashboard ? (
         <>
           <View style={styles.statGrid}>
-            <View style={[styles.statCard, styles.accentCard]}>
+            <View style={styles.statCard}>
               <Text style={styles.statLabel}>{tr("total")}</Text>
-              <Text style={styles.accentValue}>{dashboard.summary.totalAmount}</Text>
+              <Text style={styles.statValue}>{dashboard.summary.totalAmount}</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>{tr("activeSubscriptions")}</Text>
@@ -91,9 +91,11 @@ const DashboardScreen = () => {
                 <Text style={styles.quickTitle}>{tr("openSubscriptions")}</Text>
                 <Text style={styles.quickMeta}>{tr("list")}</Text>
               </Pressable>
-              <Pressable style={styles.quickCard} onPress={() => navigation.navigate("Upcoming")}>
-                <Text style={styles.quickTitle}>{tr("openSchedule")}</Text>
-                <Text style={styles.quickMeta}>{dashboard.upcoming.length} {tr("upcomingChargesTitle").toLowerCase()}</Text>
+              <Pressable style={styles.quickCard} onPress={() => navigation.navigate("Analytics")}>
+                <Text style={styles.quickTitle}>{tr("openAnalytics")}</Text>
+                <Text style={styles.quickMeta}>
+                  {dashboard.summary.totalAmount} {dashboard.summary.currency}
+                </Text>
               </Pressable>
               <Pressable style={[styles.quickCard, styles.quickCardWide]} onPress={() => navigation.navigate("Import")}>
                 <View style={styles.quickHeader}>
@@ -224,9 +226,6 @@ const createStyles = (colors: AppPalette) =>
     borderColor: colors.border,
     gap: 8
   },
-  accentCard: {
-    backgroundColor: colors.accent
-  },
   statLabel: {
     color: colors.textMuted,
     fontSize: 12,
@@ -235,11 +234,6 @@ const createStyles = (colors: AppPalette) =>
   },
   statValue: {
     color: colors.text,
-    fontSize: 28,
-    fontWeight: "900"
-  },
-  accentValue: {
-    color: colors.accentText,
     fontSize: 28,
     fontWeight: "900"
   },
