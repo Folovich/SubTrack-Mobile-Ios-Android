@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import type { MainTabsParamList } from "../types/navigation";
 import DashboardScreen from "../screens/DashboardScreen";
 import SubscriptionsScreen from "../screens/SubscriptionsScreen";
-import UpcomingScreen from "../screens/UpcomingScreen";
+import AnalyticsScreen from "../screens/AnalyticsScreen";
 import ImportScreen from "../screens/ImportScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { useI18n } from "../context/SettingsContext";
@@ -48,7 +48,7 @@ const MainTabs = () => {
         component={SubscriptionsScreen}
         options={{ title: tr("tabSubscriptions") }}
       />
-      <Tab.Screen name="Upcoming" component={UpcomingScreen} options={{ title: tr("tabSchedule") }} />
+      <Tab.Screen name="Analytics" component={AnalyticsScreen} options={{ title: tr("tabAnalytics") }} />
       <Tab.Screen name="Import" component={ImportScreen} options={{ title: tr("tabMail") }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: tr("tabSettings") }} />
     </Tab.Navigator>

@@ -6,7 +6,7 @@ export type AuthStackParamList = {
 export type MainTabsParamList = {
   Dashboard: undefined;
   Subscriptions: undefined;
-  Upcoming: undefined;
+  Analytics: undefined;
   Import: undefined;
   Settings: undefined;
 };

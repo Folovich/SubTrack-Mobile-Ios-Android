@@ -13,8 +13,12 @@ import type {
   AnalyticsSummary
 } from "../types/analytics";
 import type { AppPalette } from "../theme/theme";
+import type { AppTheme } from "../types/settings";
 
-const chartPalette = ["#f5a623", "#ffca57", "#54cbff", "#34d399", "#f97316", "#8b5cf6"];
+const getChartPalette = (theme: AppTheme) =>
+  theme === "light"
+    ? ["#00aff0", "#54cbff", "#2dd4bf", "#f59e0b", "#f97316", "#2563eb"]
+    : ["#f5a623", "#ffca57", "#54cbff", "#34d399", "#f97316", "#8b5cf6"];
 
 const formatAmount = (amount: number, currency?: string | null) => {
   const normalizedCurrency = currency ?? "USD";
@@ -22,8 +26,9 @@ const formatAmount = (amount: number, currency?: string | null) => {
 };
 
 const AnalyticsScreen = () => {
-  const { tr, colors } = useI18n();
+  const { tr, colors, theme } = useI18n();
   const styles = createStyles(colors);
+  const chartPalette = getChartPalette(theme);
   const [period, setPeriod] = useState<AnalyticsPeriod>("month");
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [byCategory, setByCategory] = useState<AnalyticsByCategory | null>(null);
