@@ -1,9 +1,10 @@
 import axios from "axios";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { importApi } from "../api/importApi";
 import AppButton from "../components/AppButton";
 import { useI18n } from "../context/SettingsContext";
+import type { TranslationKey } from "../i18n/translations";
 import type {
   ImportConsentStatus,
   ImportErrorItem,
@@ -25,20 +26,54 @@ const formatDateTime = (value: string | null) => {
   }).format(new Date(value));
 };
 
-const getErrorMessage = (error: unknown) => {
+const mapMailMessage = (message: string | undefined, tr: (key: TranslationKey) => string) => {
+  if (!message) {
+    return tr("mailUnknownError");
+  }
+
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("open") && (normalized.includes("url") || normalized.includes("browser"))) {
+    return tr("mailConnectOpenError");
+  }
+
+  if (normalized.includes("oauth") || normalized.includes("gmail") || normalized.includes("authorization")) {
+    return tr("mailConnectFailed");
+  }
+
+  return message;
+};
+
+const getErrorMessage = (error: unknown, tr: (key: TranslationKey) => string) => {
   if (axios.isAxiosError<{ message?: string; errors?: Record<string, string> }>(error)) {
     const fieldError = error.response?.data?.errors
       ? Object.values(error.response.data.errors)[0]
       : null;
 
-    return fieldError ?? error.response?.data?.message ?? "Request failed";
+    return mapMailMessage(fieldError ?? error.response?.data?.message, tr);
   }
 
   if (error instanceof Error) {
-    return error.message;
+    return mapMailMessage(error.message, tr);
   }
 
-  return "Unexpected error";
+  return tr("mailUnknownError");
+};
+
+const getFriendlyLastError = (message: string, tr: (key: TranslationKey) => string) => {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("oauth") ||
+    normalized.includes("token") ||
+    normalized.includes("gmail") ||
+    normalized.includes("consent") ||
+    normalized.includes("authorization")
+  ) {
+    return tr("mailLastErrorFriendly");
+  }
+
+  return message;
 };
 
 const getItemSummary = (item: ImportItemResult) => {
@@ -80,11 +115,11 @@ const ImportScreen = () => {
       setIntegration(integrationResponse);
       setHistory(historyResponse);
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError, tr));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [tr]);
 
   useEffect(() => {
     void loadImportPage();
@@ -115,15 +150,10 @@ const ImportScreen = () => {
 
     try {
       const response = await importApi.startOAuth();
-      const supported = await Linking.canOpenURL(response.authorizationUrl);
-
-      if (!supported) {
-        throw new Error(tr("supportDraftOpenError"));
-      }
-
       await Linking.openURL(response.authorizationUrl);
     } catch (connectError) {
-      setError(getErrorMessage(connectError));
+      setError(getErrorMessage(connectError, tr));
+    } finally {
       setBusyAction(null);
     }
   };
@@ -152,7 +182,7 @@ const ImportScreen = () => {
         text: tr("mailDisconnectSuccess")
       });
     } catch (disconnectError) {
-      setError(getErrorMessage(disconnectError));
+      setError(getErrorMessage(disconnectError, tr));
     } finally {
       setBusyAction(null);
     }
@@ -172,7 +202,7 @@ const ImportScreen = () => {
         text: tr("mailSyncSuccess")
       });
     } catch (syncError) {
-      setError(getErrorMessage(syncError));
+      setError(getErrorMessage(syncError, tr));
     } finally {
       setBusyAction(null);
     }
@@ -186,10 +216,20 @@ const ImportScreen = () => {
       const details = await importApi.getById(id);
       setResult(details);
     } catch (detailsError) {
-      setError(getErrorMessage(detailsError));
+      setError(getErrorMessage(detailsError, tr));
     } finally {
       setBusyAction(null);
     }
+  };
+
+  const onConnectPress = () => {
+    Alert.alert(tr("mailConnectConfirmTitle"), tr("mailConnectConfirmMessage"), [
+      { text: tr("cancel"), style: "cancel" },
+      {
+        text: tr("mailConnectConfirmAction"),
+        onPress: () => void handleConnect()
+      }
+    ]);
   };
 
   return (
@@ -243,7 +283,7 @@ const ImportScreen = () => {
         <Text style={styles.meta}>{connectionHint}</Text>
         {integration?.lastErrorMessage ? (
           <Text style={styles.meta}>
-            {tr("mailLastError")}: {integration.lastErrorMessage}
+            {tr("mailLastError")}: {getFriendlyLastError(integration.lastErrorMessage, tr)}
           </Text>
         ) : null}
 
@@ -258,7 +298,7 @@ const ImportScreen = () => {
                     ? tr("mailReconnect")
                     : tr("mailConnect")
               }
-              onPress={() => void handleConnect()}
+              onPress={onConnectPress}
               disabled={busyAction !== null}
             />
           </View>

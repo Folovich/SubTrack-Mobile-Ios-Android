@@ -30,10 +30,7 @@ import type { AppPalette } from "../theme/theme";
 
 const billingPeriods: BillingPeriod[] = ["WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY"];
 const statusOptions: Array<SubscriptionStatus | "ALL"> = ["ALL", "ACTIVE", "PAUSED", "CANCELED"];
-const currencies = [
-  { code: "USD", label: "USD" },
-  { code: "RUB", label: "RUB" }
-];
+const currencies = [{ code: "USD", label: "USD" }];
 
 const initialForm: SubscriptionRequest = {
   serviceName: "",
@@ -187,7 +184,7 @@ const SubscriptionsScreen = () => {
     setForm({
       serviceName: subscription.serviceName,
       amount: subscription.amount,
-      currency: subscription.currency,
+      currency: subscription.currency === "USD" ? subscription.currency : "USD",
       billingPeriod: subscription.billingPeriod,
       nextBillingDate: subscription.nextBillingDate,
       status: subscription.status,
